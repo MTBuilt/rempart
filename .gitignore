@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.installed
+
+# Node
+node_modules/
+frontend/dist/
+
+# Built frontend served by backend
+backend/rempart/static/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config with secrets
+/etc/rempart/
+*.key
+*.crt
+*.pem
+
+# Environment (secrets)
+.env
+.env.local
+.env.production
+
+# Auth config (contains hashed passwords)
+.nftgui_auth.json
+.rempart_auth.json
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Claude Code local settings
+.claude/
