@@ -9,10 +9,13 @@ import {
   Layers,
   Plus,
 } from "lucide-react";
-import type { ChainModel } from "../../types/nftables";
+import type { ChainModel, NftRule } from "../../types/nftables";
 import { humanizeChain, humanizePolicy } from "../../utils/humanize";
 import { RuleCard } from "./RuleCard";
 import { RuleBuilder } from "../RuleBuilder/RuleBuilder";
+import { ConfirmDialog } from "../Dialogs/ConfirmDialog";
+import { useRulesetStore } from "../../state/rulesetStore";
+import { reverseParseRule } from "../RuleBuilder/reverseParseRule";
 
 const hookIcons: Record<string, React.ReactNode> = {
   input: <Inbox size={16} />,
@@ -35,7 +38,51 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
   const hookLabel = isBaseChain ? humanizeChain(c) : "";
   const policyInfo = humanizePolicy(c.policy);
   const icon = hookIcons[c.hook ?? ""] ?? null;
+
   const [showBuilder, setShowBuilder] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [editingRule, setEditingRule] = useState<NftRule | null>(null);
+
+  const updateModelFromTree = useRulesetStore((s) => s.updateModelFromTree);
+
+  const handleDeleteRule = (handle: number) => {
+    updateModelFromTree((model) => {
+      const clone = structuredClone(model);
+      for (const tm of clone.tables) {
+        if (tm.table.family === c.family && tm.table.name === c.table) {
+          for (const cm of tm.chains) {
+            if (cm.chain.name === c.name) {
+              cm.rules = cm.rules.filter((r) => r.handle !== handle);
+            }
+          }
+        }
+      }
+      return clone;
+    });
+    setPendingDelete(null);
+  };
+
+  const handleMoveRule = (handle: number, direction: "up" | "down") => {
+    updateModelFromTree((model) => {
+      const clone = structuredClone(model);
+      for (const tm of clone.tables) {
+        if (tm.table.family === c.family && tm.table.name === c.table) {
+          for (const cm of tm.chains) {
+            if (cm.chain.name === c.name) {
+              const idx = cm.rules.findIndex((r) => r.handle === handle);
+              if (idx === -1) return clone;
+              const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+              if (swapIdx < 0 || swapIdx >= cm.rules.length) return clone;
+              [cm.rules[idx], cm.rules[swapIdx]] = [cm.rules[swapIdx], cm.rules[idx]];
+            }
+          }
+        }
+      }
+      return clone;
+    });
+  };
+
+  const ruleCount = chainModel.rules.length;
 
   return (
     <div style={styles.container}>
@@ -72,7 +119,7 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
 
       {/* Rules flow */}
       <div style={styles.flow}>
-        {chainModel.rules.length === 0 ? (
+        {ruleCount === 0 ? (
           <div style={styles.emptyFlow}>
             Aucune règle
             {c.policy === "drop"
@@ -89,8 +136,17 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
                 animation: `fadeIn 0.3s ease-out ${i * 0.05}s both`,
               }}
             >
-              <RuleCard rule={rule} index={i} />
-              {i < chainModel.rules.length - 1 && (
+              <RuleCard
+                rule={rule}
+                index={i}
+                onEdit={() => setEditingRule(rule)}
+                onDelete={() => setPendingDelete(rule.handle)}
+                onMoveUp={() => handleMoveRule(rule.handle, "up")}
+                onMoveDown={() => handleMoveRule(rule.handle, "down")}
+                isFirst={i === 0}
+                isLast={i === ruleCount - 1}
+              />
+              {i < ruleCount - 1 && (
                 <div style={styles.arrow}>
                   <ArrowDown size={14} color="#334155" />
                 </div>
@@ -100,7 +156,7 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
         )}
 
         {/* Add rule button */}
-        {chainModel.rules.length > 0 && (
+        {ruleCount > 0 && (
           <div style={styles.arrow}>
             <ArrowDown size={14} color="#334155" />
           </div>
@@ -114,7 +170,7 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
         </button>
 
         {/* Default policy card */}
-        {c.policy && chainModel.rules.length > 0 && (
+        {c.policy && ruleCount > 0 && (
           <>
             <div style={styles.arrow}>
               <ArrowDown size={14} color="#334155" />
@@ -141,7 +197,7 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
         )}
       </div>
 
-      {/* Rule Builder modal */}
+      {/* Rule Builder modal — add mode */}
       {showBuilder && (
         <RuleBuilder
           family={c.family}
@@ -149,6 +205,32 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
           chain={c.name}
           availableChains={availableChains}
           onClose={() => setShowBuilder(false)}
+        />
+      )}
+
+      {/* Rule Builder modal — edit mode */}
+      {editingRule && (
+        <RuleBuilder
+          family={c.family}
+          table={c.table}
+          chain={c.name}
+          availableChains={availableChains}
+          onClose={() => setEditingRule(null)}
+          editRule={editingRule}
+          editInitialState={reverseParseRule(editingRule).state}
+          editIsExact={reverseParseRule(editingRule).isExact}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          title="Supprimer cette règle"
+          message="Êtes-vous sûr de vouloir supprimer cette règle ? Vous devrez appliquer les changements pour qu'ils prennent effet."
+          confirmLabel="Supprimer"
+          confirmColor="#ef4444"
+          onConfirm={() => handleDeleteRule(pendingDelete)}
+          onCancel={() => setPendingDelete(null)}
         />
       )}
     </div>

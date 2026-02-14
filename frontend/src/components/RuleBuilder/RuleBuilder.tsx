@@ -17,8 +17,9 @@ import {
   ArrowRight,
   Repeat,
   Plus,
+  Pencil,
 } from "lucide-react";
-import type { NftFamily } from "../../types/nftables";
+import type { NftFamily, NftRule } from "../../types/nftables";
 import { humanizeRule, getVerdictLabel } from "../../utils/humanize";
 import { serializeRule } from "../../utils/nftSerializer";
 import { useRulesetStore } from "../../state/rulesetStore";
@@ -73,6 +74,9 @@ interface RuleBuilderProps {
   chain: string;
   availableChains: string[];
   onClose: () => void;
+  editRule?: NftRule;
+  editInitialState?: BuilderState;
+  editIsExact?: boolean;
 }
 
 // ── Component ─────────────────────────────────
@@ -83,8 +87,12 @@ export function RuleBuilder({
   chain,
   availableChains,
   onClose,
+  editRule,
+  editInitialState,
+  editIsExact,
 }: RuleBuilderProps) {
-  const [state, setState] = useState<BuilderState>(INITIAL_STATE);
+  const isEdit = !!editRule;
+  const [state, setState] = useState<BuilderState>(editInitialState ?? INITIAL_STATE);
   const updateModelFromTree = useRulesetStore((s) => s.updateModelFromTree);
 
   // Derived
@@ -127,14 +135,27 @@ export function RuleBuilder({
         if (tm.table.family === family && tm.table.name === table) {
           for (const cm of tm.chains) {
             if (cm.chain.name === chain) {
-              cm.rules.push({
-                family,
-                table,
-                chain,
-                handle: Date.now(),
-                expr: stmts,
-                comment: state.comment || undefined,
-              });
+              if (isEdit) {
+                // Replace existing rule by handle
+                const idx = cm.rules.findIndex((r) => r.handle === editRule.handle);
+                if (idx !== -1) {
+                  cm.rules[idx] = {
+                    ...cm.rules[idx],
+                    expr: stmts,
+                    comment: state.comment || undefined,
+                  };
+                }
+              } else {
+                // Add new rule
+                cm.rules.push({
+                  family,
+                  table,
+                  chain,
+                  handle: Date.now(),
+                  expr: stmts,
+                  comment: state.comment || undefined,
+                });
+              }
             }
           }
         }
@@ -158,8 +179,12 @@ export function RuleBuilder({
         {/* ── Header ── */}
         <div style={styles.header}>
           <div style={styles.headerTitle}>
-            <Plus size={16} color="#3b82f6" />
-            <span>Nouvelle règle</span>
+            {isEdit ? (
+              <Pencil size={16} color="#f59e0b" />
+            ) : (
+              <Plus size={16} color="#3b82f6" />
+            )}
+            <span>{isEdit ? "Modifier la règle" : "Nouvelle règle"}</span>
             <span style={styles.headerChain}>
               dans {chain}
             </span>
@@ -171,6 +196,18 @@ export function RuleBuilder({
 
         {/* ── Body ── */}
         <div style={styles.body}>
+          {/* Inexact parse warning */}
+          {isEdit && editIsExact === false && (
+            <div style={styles.inexactWarning}>
+              <AlertTriangle size={14} />
+              <span>
+                Certains éléments de la règle originale n'ont pas pu être
+                mappés dans le formulaire. Ils seront perdus à
+                l'enregistrement.
+              </span>
+            </div>
+          )}
+
           {/* Templates */}
           <Section title="Templates rapides">
             <div style={styles.templateGrid}>
@@ -608,8 +645,8 @@ export function RuleBuilder({
             disabled={!valid}
             onClick={handleSubmit}
           >
-            <Plus size={14} />
-            Ajouter la règle
+            {isEdit ? <Check size={14} /> : <Plus size={14} />}
+            {isEdit ? "Enregistrer les modifications" : "Ajouter la règle"}
           </button>
         </div>
       </div>
@@ -758,6 +795,21 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflow: "auto",
     padding: "0 18px 18px",
+  },
+
+  // Inexact warning
+  inexactWarning: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: "10px 14px",
+    marginTop: 12,
+    background: "#422006",
+    border: "1px solid #92400e",
+    borderRadius: 8,
+    fontSize: 12,
+    color: "#fbbf24",
+    lineHeight: 1.5,
   },
 
   // Sections

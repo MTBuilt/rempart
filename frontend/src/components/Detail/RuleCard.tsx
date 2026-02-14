@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Check,
   X,
@@ -7,6 +8,10 @@ import {
   Gauge,
   MessageSquare,
   Activity,
+  Pencil,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import type { NftRule } from "../../types/nftables";
 import {
@@ -28,7 +33,27 @@ const verdictIcons: Record<string, React.ReactNode> = {
   other: <ArrowRight size={14} />,
 };
 
-export function RuleCard({ rule }: { rule: NftRule; index: number }) {
+interface RuleCardProps {
+  rule: NftRule;
+  index?: number;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+}
+
+export function RuleCard({
+  rule,
+  onEdit,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+}: RuleCardProps) {
+  const [hovered, setHovered] = useState(false);
   const description = humanizeRule(rule);
   const verdict = getVerdictLabel(rule.expr);
   const counter = getRuleCounter(rule.expr);
@@ -40,9 +65,11 @@ export function RuleCard({ rule }: { rule: NftRule; index: number }) {
         ...styles.card,
         borderLeftColor: verdict.color,
       }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <div style={styles.cardBody}>
-        {/* Main row: icon + description + verdict badge */}
+        {/* Main row: icon + description + actions + verdict badge */}
         <div style={styles.mainRow}>
           <div
             style={{
@@ -62,6 +89,53 @@ export function RuleCard({ rule }: { rule: NftRule; index: number }) {
               </div>
             )}
           </div>
+
+          {/* Action buttons (visible on hover) */}
+          <div
+            style={{
+              ...styles.actions,
+              opacity: hovered ? 1 : 0,
+              pointerEvents: hovered ? "auto" : "none",
+            }}
+          >
+            {onMoveUp && !isFirst && (
+              <button
+                style={styles.actionBtn}
+                onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+                title="Monter"
+              >
+                <ChevronUp size={14} />
+              </button>
+            )}
+            {onMoveDown && !isLast && (
+              <button
+                style={styles.actionBtn}
+                onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+                title="Descendre"
+              >
+                <ChevronDown size={14} />
+              </button>
+            )}
+            {onEdit && (
+              <button
+                style={{ ...styles.actionBtn, ...styles.editBtn }}
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                title="Modifier"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                style={{ ...styles.actionBtn, ...styles.deleteBtn }}
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                title="Supprimer"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+
           <div
             style={{
               ...styles.verdictBadge,
@@ -140,6 +214,33 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: "#64748b",
     marginTop: 4,
+  },
+  actions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 2,
+    flexShrink: 0,
+    transition: "opacity 0.15s",
+  },
+  actionBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 26,
+    height: 26,
+    background: "transparent",
+    border: "none",
+    borderRadius: 4,
+    color: "#64748b",
+    cursor: "pointer",
+    padding: 0,
+    transition: "color 0.15s, background 0.15s",
+  },
+  editBtn: {
+    color: "#64748b",
+  },
+  deleteBtn: {
+    color: "#64748b",
   },
   verdictBadge: {
     fontSize: 11,
