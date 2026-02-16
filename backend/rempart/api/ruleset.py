@@ -63,24 +63,18 @@ async def parse_ruleset_text(
     request: Request,
     _: bool = Depends(get_current_user),
 ):
-    """Parse nft text syntax and return the structured model.
+    """Validate nft text syntax.
 
-    This is used for the code-to-tree sync direction.
-    The text is validated using `nft -c -f` and if valid,
-    we apply it in check mode and re-read the JSON to get
-    the structured model.
+    Used for the code-to-tree sync: validates syntax in real-time
+    via `nft -c -f`. The visual tree updates after the user
+    explicitly applies — the WebSocket poller detects the change
+    and broadcasts it to all connected clients.
     """
     executor = request.app.state.executor
     valid, errors = await executor.validate(body.text)
     if not valid:
         return ParseResponse(valid=False, errors=errors)
 
-    # The text is valid nft syntax. To get the JSON model,
-    # we would ideally apply in check mode and read back.
-    # For MVP, we return valid=True and let the frontend
-    # know the text is syntactically correct. A full re-parse
-    # from the text would require applying and re-reading.
-    # TODO: Implement text-to-model conversion via nft round-trip
     return ParseResponse(valid=True, errors=[])
 
 

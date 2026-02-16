@@ -18,7 +18,9 @@ export class NftWebSocket {
   private maxReconnectDelay = 30000;
   private shouldReconnect = true;
 
-  constructor(private url: string = `ws://${window.location.host}/ws/live`) {}
+  constructor(
+    private url: string = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/live`,
+  ) {}
 
   connect(): void {
     this.shouldReconnect = true;

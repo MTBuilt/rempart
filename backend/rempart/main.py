@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .nft.rollback import RollbackManager
+from .ws.manager import ConnectionManager
+from .ws.poller import RulesetPoller
 
 logger = logging.getLogger("rempart")
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +35,19 @@ async def lifespan(app: FastAPI):
         executor=app.state.executor,
         default_timeout=settings.rollback_timeout,
     )
+
+    # WebSocket live updates
+    app.state.ws_manager = ConnectionManager()
+    poller = RulesetPoller(
+        executor=app.state.executor,
+        manager=app.state.ws_manager,
+    )
+    poller.start()
+    logger.info("RulesetPoller started (interval=%.1fs)", poller.interval)
+
     yield
+
+    poller.stop()
 
 
 app = FastAPI(
@@ -56,10 +70,12 @@ app.add_middleware(
 from .api.ruleset import router as ruleset_router
 from .api.apply import router as apply_router
 from .auth.router import router as auth_router
+from .ws.routes import router as ws_router
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(ruleset_router, prefix="/api", tags=["ruleset"])
 app.include_router(apply_router, prefix="/api", tags=["apply"])
+app.include_router(ws_router)
 
 # Serve frontend static files (production build)
 static_dir = Path(__file__).parent / "static"
