@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import {
   Shield,
   LogOut,
@@ -5,10 +6,15 @@ import {
   RotateCcw,
   Code,
   ChevronRight,
+  Download,
+  Upload,
+  Save,
+  Check,
 } from "lucide-react";
 import { useAuthStore } from "../../state/authStore";
 import { useUiStore } from "../../state/uiStore";
 import { useRulesetStore } from "../../state/rulesetStore";
+import * as api from "../../api/endpoints";
 
 interface HeaderProps {
   onApply: () => void;
@@ -26,6 +32,11 @@ export function Header({ onApply, applyDisabled }: HeaderProps) {
     navigateToDashboard,
   } = useUiStore();
   const model = useRulesetStore((s) => s.model);
+  const nftText = useRulesetStore((s) => s.nftText);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Breadcrumb: find selected table name
   let tableName = "";
@@ -36,6 +47,56 @@ export function Header({ onApply, applyDisabled }: HeaderProps) {
     );
     if (tm) tableName = `${tm.table.family} ${tm.table.name}`;
   }
+
+  // ── Export: download nftText as .nft file ──
+  const handleExport = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([nftText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rempart-export-${date}.nft`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Import: read file, validate, load into code panel ──
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(null);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const text = reader.result as string;
+      try {
+        const result = await api.importRuleset(text);
+        if (result.valid) {
+          useRulesetStore.getState().updateTextFromCode(result.text);
+        } else {
+          setImportError(result.errors.join("; "));
+          setTimeout(() => setImportError(null), 5000);
+        }
+      } catch {
+        setImportError("Erreur lors de l'import");
+        setTimeout(() => setImportError(null), 5000);
+      }
+    };
+    reader.readAsText(file);
+    // Reset so the same file can be re-imported
+    e.target.value = "";
+  };
+
+  // ── Save to disk ──
+  const handleSave = async () => {
+    try {
+      await api.saveRulesetToDisk();
+      setSaveStatus("ok");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  };
 
   return (
     <header style={styles.header}>
@@ -71,6 +132,42 @@ export function Header({ onApply, applyDisabled }: HeaderProps) {
           Code
         </button>
         <button
+          style={styles.iconBtn}
+          onClick={handleExport}
+          title="Exporter le ruleset (.nft)"
+        >
+          <Download size={14} />
+        </button>
+        <button
+          style={styles.iconBtn}
+          onClick={() => fileInputRef.current?.click()}
+          title="Importer un fichier .nft"
+        >
+          <Upload size={14} />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".nft,.conf"
+          style={{ display: "none" }}
+          onChange={handleImport}
+        />
+        <button
+          style={{
+            ...styles.iconBtn,
+            ...(saveStatus === "ok"
+              ? { borderColor: "#22c55e", color: "#22c55e" }
+              : saveStatus === "error"
+                ? { borderColor: "#ef4444", color: "#ef4444" }
+                : {}),
+          }}
+          onClick={handleSave}
+          title="Sauvegarder dans nftables.conf"
+        >
+          {saveStatus === "ok" ? <Check size={14} /> : <Save size={14} />}
+        </button>
+        <div style={styles.separator} />
+        <button
           style={{
             ...styles.applyBtn,
             opacity: applyDisabled ? 0.5 : 1,
@@ -96,6 +193,9 @@ export function Header({ onApply, applyDisabled }: HeaderProps) {
           <LogOut size={14} />
         </button>
       </div>
+      {importError && (
+        <div style={styles.importError}>{importError}</div>
+      )}
     </header>
   );
 }
@@ -132,6 +232,7 @@ function SyncIndicator({ state }: { state: string }) {
 
 const styles: Record<string, React.CSSProperties> = {
   header: {
+    position: "relative" as const,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -214,5 +315,25 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     color: "#64748b",
     cursor: "pointer",
+  },
+  separator: {
+    width: 1,
+    height: 20,
+    background: "#334155",
+    margin: "0 2px",
+  },
+  importError: {
+    position: "absolute" as const,
+    top: 48,
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#7f1d1d",
+    color: "#fca5a5",
+    fontSize: 12,
+    padding: "6px 14px",
+    borderRadius: "0 0 8px 8px",
+    border: "1px solid #991b1b",
+    borderTop: "none",
+    zIndex: 100,
   },
 };

@@ -1,13 +1,18 @@
-"""Ruleset API routes - read, parse, validate."""
+"""Ruleset API routes - read, parse, validate, save, import."""
 
 from __future__ import annotations
+
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from ..auth.dependencies import get_current_user
+from ..config import settings
 from ..nft.executor import NftError
 from ..nft.parser import parse_ruleset_json
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -88,3 +93,57 @@ async def validate_ruleset(
     executor = request.app.state.executor
     valid, errors = await executor.validate(body.text)
     return ValidateResponse(valid=valid, errors=errors)
+
+
+# ── Save to disk (persistence) ───────────────
+
+
+class SaveResponse(BaseModel):
+    saved: bool
+    path: str
+
+
+@router.post("/ruleset/save", response_model=SaveResponse)
+async def save_ruleset_to_disk(
+    request: Request,
+    _: bool = Depends(get_current_user),
+):
+    """Save the current live ruleset to disk for persistence across reboots."""
+    executor = request.app.state.executor
+    path = settings.nftables_conf_path
+    try:
+        await executor.save_to_disk(path)
+        logger.info("Ruleset saved to %s", path)
+        return SaveResponse(saved=True, path=path)
+    except PermissionError:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission refusée : impossible d'écrire dans {path}",
+        )
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Import (upload .nft file) ────────────────
+
+
+class ImportRequest(BaseModel):
+    text: str
+
+
+class ImportResponse(BaseModel):
+    valid: bool
+    errors: list[str] = []
+    text: str = ""
+
+
+@router.post("/ruleset/import", response_model=ImportResponse)
+async def import_ruleset(
+    body: ImportRequest,
+    request: Request,
+    _: bool = Depends(get_current_user),
+):
+    """Validate an uploaded .nft file and return it for loading into the editor."""
+    executor = request.app.state.executor
+    valid, errors = await executor.validate(body.text)
+    return ImportResponse(valid=valid, errors=errors, text=body.text)

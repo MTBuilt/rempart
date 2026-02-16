@@ -107,3 +107,8 @@ class NftExecutor:
         """
         text = await self.list_ruleset_text()
         return f"flush ruleset\n{text}"
+
+    async def save_to_disk(self, path: str) -> None:
+        """Save the current ruleset to a file for persistence across reboots."""
+        text = await self.save_current()
+        Path(path).write_text(text, encoding="utf-8")

@@ -44,6 +44,16 @@ export async function validateRuleset(text: string) {
   return post<ValidateResponse>("/ruleset/validate", { text });
 }
 
+// ── Save & Import ────────────────────────────
+
+export async function saveRulesetToDisk() {
+  return post<{ saved: boolean; path: string }>("/ruleset/save");
+}
+
+export async function importRuleset(text: string) {
+  return post<{ valid: boolean; errors: string[]; text: string }>("/ruleset/import", { text });
+}
+
 // ── Apply & Rollback ──────────────────────────
 
 export async function applyRuleset(

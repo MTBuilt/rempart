@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     # Path to nft binary (ignored in mock mode)
     nft_binary: str = "/usr/sbin/nft"
+    # Path to save the persistent ruleset config
+    nftables_conf_path: str = "/etc/nftables.conf"
 
     model_config = {"env_prefix": "REMPART_"}
 

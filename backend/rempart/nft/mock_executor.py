@@ -173,6 +173,10 @@ class MockExecutor:
         text = await self.list_ruleset_text()
         return f"flush ruleset\n{text}"
 
+    async def save_to_disk(self, path: str) -> None:
+        """Mock save: logs the action instead of writing to disk."""
+        logger.info("MockExecutor: save_to_disk(%s) — simulated", path)
+
     def _simulate_counters(self, data: dict) -> None:
         """Add realistic counter increments to simulate live traffic."""
         elapsed = time.time() - self._counter_base_time
