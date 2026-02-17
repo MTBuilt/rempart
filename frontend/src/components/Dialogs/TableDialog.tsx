@@ -2,14 +2,15 @@ import { useState } from "react";
 import { Table2, X } from "lucide-react";
 import type { NftFamily, NftTable, RulesetModel } from "../../types/nftables";
 import { useRulesetStore } from "../../state/rulesetStore";
+import { HelpTip } from "../Shared/HelpTip";
 
-const FAMILIES: { value: NftFamily; label: string }[] = [
-  { value: "inet", label: "inet — Internet (IPv4+IPv6)" },
-  { value: "ip", label: "ip — IPv4" },
-  { value: "ip6", label: "ip6 — IPv6" },
-  { value: "arp", label: "arp — ARP" },
-  { value: "bridge", label: "bridge — Bridge" },
-  { value: "netdev", label: "netdev — Netdev" },
+const FAMILIES: { value: NftFamily; label: string; rec?: boolean }[] = [
+  { value: "inet", label: "inet — IPv4 + IPv6 (recommandé)", rec: true },
+  { value: "ip", label: "ip — IPv4 uniquement" },
+  { value: "ip6", label: "ip6 — IPv6 uniquement" },
+  { value: "arp", label: "arp — Protocole ARP" },
+  { value: "bridge", label: "bridge — Pont réseau (L2)" },
+  { value: "netdev", label: "netdev — Filtrage par interface" },
 ];
 
 const NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -127,7 +128,10 @@ export function TableDialog({ onClose, editTable }: TableDialogProps) {
         <div style={styles.body}>
           {/* Family */}
           <div style={styles.field}>
-            <label style={styles.label}>Famille</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Famille</label>
+              <HelpTip text="La famille détermine quels types de paquets cette table peut traiter. « inet » est le choix le plus courant : il gère à la fois IPv4 et IPv6 dans une seule table." />
+            </div>
             <select
               style={styles.select}
               value={family}
@@ -143,7 +147,10 @@ export function TableDialog({ onClose, editTable }: TableDialogProps) {
 
           {/* Name */}
           <div style={styles.field}>
-            <label style={styles.label}>Nom</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Nom</label>
+              <HelpTip text="Un nom descriptif pour votre table, par exemple « filter » pour du filtrage ou « nat » pour de la traduction d'adresses. Le nom doit être unique dans cette famille." />
+            </div>
             <input
               style={{
                 ...styles.input,
@@ -174,7 +181,10 @@ export function TableDialog({ onClose, editTable }: TableDialogProps) {
 
           {/* Dormant flag */}
           <div style={styles.field}>
-            <label style={styles.label}>Options</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Options</label>
+              <HelpTip text="Une table dormante est chargée en mémoire mais n'intercepte aucun trafic. Utile pour préparer des règles sans les activer immédiatement." />
+            </div>
             <button
               style={{
                 ...styles.chip,
@@ -263,6 +273,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: 6,
+  },
+  labelRow: {
+    display: "flex",
+    alignItems: "center",
   },
   label: {
     fontSize: 12,

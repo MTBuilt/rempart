@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Database, X } from "lucide-react";
 import type { NftFamily, NftSet, RulesetModel } from "../../types/nftables";
 import { useRulesetStore } from "../../state/rulesetStore";
+import { HelpTip } from "../Shared/HelpTip";
 
 const NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -163,7 +164,10 @@ export function SetDialog({
         <div style={styles.body}>
           {/* Name */}
           <div style={styles.field}>
-            <label style={styles.label}>Nom</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Nom</label>
+              <HelpTip text="Un set est une liste nommée de valeurs (IP, ports, etc.) que vous pouvez référencer dans vos règles. Ex : « blocked_ips » pour une liste d'adresses à bloquer." />
+            </div>
             <input
               style={{
                 ...styles.input,
@@ -194,7 +198,10 @@ export function SetDialog({
 
           {/* Type */}
           <div style={styles.field}>
-            <label style={styles.label}>Type de données</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Type de données</label>
+              <HelpTip text="Le type de valeurs que ce set contiendra. ipv4_addr pour des adresses IP (ex: 192.168.1.1), inet_service pour des numéros de port (ex: 80, 443)." />
+            </div>
             <select
               style={styles.select}
               value={type}
@@ -210,7 +217,10 @@ export function SetDialog({
 
           {/* Flags */}
           <div style={styles.field}>
-            <label style={styles.label}>Options</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Options</label>
+              <HelpTip text="Intervalle : permet les plages d'adresses (10.0.0.0-10.0.0.255). Timeout : les éléments expirent automatiquement après un délai. Constant : le set est figé après création." />
+            </div>
             <div style={styles.flagsRow}>
               {FLAG_OPTIONS.map((opt) => {
                 const active = flags.includes(opt.value);
@@ -287,7 +297,10 @@ export function SetDialog({
 
           {/* Elements */}
           <div style={styles.field}>
-            <label style={styles.label}>Éléments (séparés par virgule)</label>
+            <div style={styles.labelRow}>
+              <label style={styles.label}>Éléments (séparés par virgule)</label>
+              <HelpTip text="Valeurs initiales du set. Vous pouvez aussi laisser vide : les règles « add @nom_set » ajouteront des éléments dynamiquement (utile pour le rate-limiting ou le ban automatique)." />
+            </div>
             <textarea
               style={styles.textarea}
               value={elements}
@@ -376,6 +389,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: 6,
+  },
+  labelRow: {
+    display: "flex",
+    alignItems: "center",
   },
   label: {
     fontSize: 12,
