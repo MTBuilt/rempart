@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { Loader2 } from "lucide-react";
 import { Header } from "./Header";
@@ -13,24 +13,22 @@ import { NftWebSocket } from "../../api/websocket";
 
 export function AppShell() {
   const [showApply, setShowApply] = useState(false);
-  const { loadRuleset, isLoading, error, model } = useRulesetStore();
+  const isLoading = useRulesetStore((s) => s.isLoading);
+  const error = useRulesetStore((s) => s.error);
+  const model = useRulesetStore((s) => s.model);
   const { activeView, showCodePanel } = useUiStore();
-  const wsConnected = useRef(false);
 
+  // Load ruleset once on mount (use getState to avoid dependency issues)
   useEffect(() => {
-    loadRuleset();
-  }, [loadRuleset]);
+    useRulesetStore.getState().loadRuleset();
+  }, []);
 
-  // Connect WebSocket once after initial load succeeds
+  // Connect WebSocket once on mount — independent of loading state
   useEffect(() => {
-    if (!model || wsConnected.current) return;
-    wsConnected.current = true;
-
     const ws = new NftWebSocket();
 
     const unsubscribe = ws.subscribe((msg) => {
       if (msg.type === "ruleset_changed") {
-        // External change detected — refresh the model from backend
         useRulesetStore.getState().loadRuleset();
       }
     });
@@ -40,9 +38,8 @@ export function AppShell() {
     return () => {
       unsubscribe();
       ws.disconnect();
-      wsConnected.current = false;
     };
-  }, [model]);
+  }, []);
 
   const handleApply = useCallback(() => {
     setShowApply(true);
@@ -70,7 +67,7 @@ export function AppShell() {
       <div style={styles.loadingContainer}>
         <div style={styles.errorCard}>
           <span style={styles.errorText}>Erreur : {error}</span>
-          <button onClick={loadRuleset} style={styles.retryBtn}>
+          <button onClick={() => useRulesetStore.getState().loadRuleset()} style={styles.retryBtn}>
             Réessayer
           </button>
         </div>

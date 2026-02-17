@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Application settings, configurable via environment variables."""
 
     host: str = "127.0.0.1"
-    port: int = 8443
+    port: int = 8080
     # Mock mode: use in-memory simulator instead of real nft binary
     mock_mode: bool = True
     # Rollback timeout in seconds when applying rules

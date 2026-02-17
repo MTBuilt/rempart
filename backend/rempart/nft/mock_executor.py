@@ -15,8 +15,6 @@ from __future__ import annotations
 import copy
 import json
 import logging
-import random
-import time
 from pathlib import Path
 
 from .executor import NftError
@@ -76,14 +74,11 @@ class MockExecutor:
 
     def __init__(self):
         self._ruleset_json: dict = _load_sample_ruleset()
-        self._counter_base_time = time.time()
         logger.info("MockExecutor initialized with sample ruleset")
 
     async def list_ruleset_json(self) -> dict:
-        """Return the current in-memory ruleset with simulated live counters."""
-        result = copy.deepcopy(self._ruleset_json)
-        self._simulate_counters(result)
-        return result
+        """Return the current in-memory ruleset."""
+        return copy.deepcopy(self._ruleset_json)
 
     async def list_ruleset_text(self) -> str:
         """Return the current ruleset as nft text syntax."""
@@ -177,22 +172,3 @@ class MockExecutor:
         """Mock save: logs the action instead of writing to disk."""
         logger.info("MockExecutor: save_to_disk(%s) — simulated", path)
 
-    def _simulate_counters(self, data: dict) -> None:
-        """Add realistic counter increments to simulate live traffic."""
-        elapsed = time.time() - self._counter_base_time
-        for obj in data.get("nftables", []):
-            if "rule" not in obj:
-                continue
-            rule = obj["rule"]
-            for stmt in rule.get("expr", []):
-                if "counter" not in stmt or not isinstance(stmt["counter"], dict):
-                    continue
-                counter = stmt["counter"]
-                # Simulate traffic: add random increments based on time
-                base_packets = counter.get("packets", 0)
-                base_bytes = counter.get("bytes", 0)
-                rate = random.uniform(0.5, 5.0)  # packets per second
-                added_packets = int(elapsed * rate + random.randint(0, 3))
-                added_bytes = added_packets * random.randint(40, 1500)
-                counter["packets"] = base_packets + added_packets
-                counter["bytes"] = base_bytes + added_bytes

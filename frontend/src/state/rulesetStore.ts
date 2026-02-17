@@ -20,6 +20,7 @@ interface RulesetState {
   // Loading
   isLoading: boolean;
   error: string | null;
+  _loadingInProgress: boolean;
 
   // Actions
   loadRuleset: () => Promise<void>;
@@ -42,8 +43,20 @@ export const useRulesetStore = create<RulesetState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  _loadingInProgress: false,
+
   loadRuleset: async () => {
-    set({ isLoading: true, error: null });
+    // Prevent concurrent calls
+    if (get()._loadingInProgress) return;
+    set({ _loadingInProgress: true });
+
+    // Only show loading spinner on initial load, not on background refresh
+    const hasModel = !!get().model;
+    if (!hasModel) {
+      set({ isLoading: true, error: null });
+    } else {
+      set({ error: null });
+    }
     try {
       const response = await api.getRuleset();
       const model = response.model;
@@ -53,11 +66,13 @@ export const useRulesetStore = create<RulesetState>((set, get) => ({
         nftText: text,
         lastEditOrigin: "server",
         isLoading: false,
+        _loadingInProgress: false,
         validationErrors: [],
       });
     } catch (e) {
       set({
         isLoading: false,
+        _loadingInProgress: false,
         error: e instanceof Error ? e.message : "Failed to load ruleset",
       });
     }
