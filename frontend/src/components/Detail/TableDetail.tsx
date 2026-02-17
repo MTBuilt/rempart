@@ -1,8 +1,21 @@
-import { ArrowLeft, Shield, Database } from "lucide-react";
+import { useState } from "react";
+import {
+  ArrowLeft,
+  Shield,
+  Database,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useRulesetStore } from "../../state/rulesetStore";
 import { useUiStore } from "../../state/uiStore";
 import { ChainFlow } from "./ChainFlow";
 import { SetCard } from "./SetCard";
+import { ChainDialog } from "../Dialogs/ChainDialog";
+import { SetDialog } from "../Dialogs/SetDialog";
+import { TableDialog } from "../Dialogs/TableDialog";
+import { ConfirmDialog } from "../Dialogs/ConfirmDialog";
+import type { NftChain, NftSet, RulesetModel } from "../../types/nftables";
 
 const familyConfig: Record<string, { color: string; label: string }> = {
   inet: { color: "#60a5fa", label: "Internet (IPv4+IPv6)" },
@@ -15,13 +28,30 @@ const familyConfig: Record<string, { color: string; label: string }> = {
 
 export function TableDetail() {
   const model = useRulesetStore((s) => s.model);
-  const { selectedTableId, navigateToDashboard } = useUiStore();
+  const updateModelFromTree = useRulesetStore((s) => s.updateModelFromTree);
+  const { selectedTableId, navigateToDashboard, navigateToTable } =
+    useUiStore();
+
+  // Chain CRUD
+  const [showChainDialog, setShowChainDialog] = useState(false);
+  const [editingChain, setEditingChain] = useState<NftChain | null>(null);
+  const [pendingDeleteChain, setPendingDeleteChain] = useState<number | null>(
+    null,
+  );
+
+  // Set CRUD
+  const [showSetDialog, setShowSetDialog] = useState(false);
+  const [editingSet, setEditingSet] = useState<NftSet | null>(null);
+  const [pendingDeleteSet, setPendingDeleteSet] = useState<number | null>(null);
+
+  // Table edit
+  const [showTableEdit, setShowTableEdit] = useState(false);
+  const [pendingDeleteTable, setPendingDeleteTable] = useState(false);
 
   if (!model || !selectedTableId) return null;
 
   const tableModel = model.tables.find(
-    (tm) =>
-      `${tm.table.family}:${tm.table.name}` === selectedTableId,
+    (tm) => `${tm.table.family}:${tm.table.name}` === selectedTableId,
   );
   if (!tableModel) return null;
 
@@ -30,6 +60,53 @@ export function TableDetail() {
     (n, c) => n + c.rules.length,
     0,
   );
+  const family = tableModel.table.family;
+  const tableName = tableModel.table.name;
+
+  const handleDeleteChain = () => {
+    if (pendingDeleteChain === null) return;
+    updateModelFromTree((model: RulesetModel) => {
+      const clone = structuredClone(model);
+      const tm = clone.tables.find(
+        (t) => t.table.family === family && t.table.name === tableName,
+      );
+      if (tm) {
+        tm.chains = tm.chains.filter(
+          (cm) => cm.chain.handle !== pendingDeleteChain,
+        );
+      }
+      return clone;
+    });
+    setPendingDeleteChain(null);
+  };
+
+  const handleDeleteSet = () => {
+    if (pendingDeleteSet === null) return;
+    updateModelFromTree((model: RulesetModel) => {
+      const clone = structuredClone(model);
+      const tm = clone.tables.find(
+        (t) => t.table.family === family && t.table.name === tableName,
+      );
+      if (tm) {
+        tm.sets = tm.sets.filter((s) => s.handle !== pendingDeleteSet);
+      }
+      return clone;
+    });
+    setPendingDeleteSet(null);
+  };
+
+  const handleDeleteTable = () => {
+    updateModelFromTree((model: RulesetModel) => {
+      const clone = structuredClone(model);
+      clone.tables = clone.tables.filter(
+        (t) =>
+          !(t.table.family === family && t.table.name === tableName),
+      );
+      return clone;
+    });
+    setPendingDeleteTable(false);
+    navigateToDashboard();
+  };
 
   return (
     <div style={styles.container}>
@@ -49,14 +126,30 @@ export function TableDetail() {
             }}
           >
             <Shield size={14} />
-            {tableModel.table.family}
+            {family}
           </div>
-          <h1 style={styles.title}>{tableModel.table.name}</h1>
+          <h1 style={styles.title}>{tableName}</h1>
           <span style={styles.subtitle}>
             {fc.label} · {tableModel.chains.length} chaîne
             {tableModel.chains.length !== 1 ? "s" : ""} · {totalRules}{" "}
             règle{totalRules !== 1 ? "s" : ""}
           </span>
+          <div style={styles.tableActions}>
+            <button
+              style={styles.tableActionBtn}
+              title="Modifier la table"
+              onClick={() => setShowTableEdit(true)}
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              style={{ ...styles.tableActionBtn, color: "#ef4444" }}
+              title="Supprimer la table"
+              onClick={() => setPendingDeleteTable(true)}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -64,31 +157,159 @@ export function TableDetail() {
       <div style={styles.section}>
         {tableModel.chains.map((cm) => (
           <ChainFlow
-            key={cm.chain.name}
+            key={cm.chain.handle}
             chainModel={cm}
             availableChains={tableModel.chains.map((c) => c.chain.name)}
+            onEditChain={() => setEditingChain(cm.chain)}
+            onDeleteChain={() => setPendingDeleteChain(cm.chain.handle)}
           />
         ))}
         {tableModel.chains.length === 0 && (
           <div style={styles.emptySection}>Aucune chaîne définie</div>
         )}
+        <button
+          style={styles.addBtn}
+          onClick={() => setShowChainDialog(true)}
+        >
+          <Plus size={14} />
+          Ajouter une chaîne
+        </button>
       </div>
 
       {/* Sets */}
-      {tableModel.sets.length > 0 && (
-        <div style={styles.section}>
-          <div style={styles.setsHeader}>
-            <Database size={16} color="#8b5cf6" />
-            <span style={styles.setsTitle}>
-              Sets ({tableModel.sets.length})
-            </span>
-          </div>
+      <div style={styles.section}>
+        <div style={styles.setsHeader}>
+          <Database size={16} color="#8b5cf6" />
+          <span style={styles.setsTitle}>
+            Sets ({tableModel.sets.length})
+          </span>
+        </div>
+        {tableModel.sets.length > 0 ? (
           <div style={styles.setsGrid}>
             {tableModel.sets.map((s) => (
-              <SetCard key={s.name} set={s} />
+              <SetCard
+                key={s.handle}
+                set={s}
+                onEdit={() => setEditingSet(s)}
+                onDelete={() => setPendingDeleteSet(s.handle)}
+              />
             ))}
           </div>
-        </div>
+        ) : (
+          <div style={styles.emptySection}>Aucun set défini</div>
+        )}
+        <button
+          style={{ ...styles.addBtn, marginTop: 12 }}
+          onClick={() => setShowSetDialog(true)}
+        >
+          <Plus size={14} />
+          Ajouter un set
+        </button>
+      </div>
+
+      {/* Chain create dialog */}
+      {showChainDialog && (
+        <ChainDialog
+          family={family}
+          table={tableName}
+          onClose={() => setShowChainDialog(false)}
+        />
+      )}
+
+      {/* Chain edit dialog */}
+      {editingChain && (
+        <ChainDialog
+          family={family}
+          table={tableName}
+          editChain={editingChain}
+          onClose={() => setEditingChain(null)}
+        />
+      )}
+
+      {/* Chain delete confirm */}
+      {pendingDeleteChain !== null && (
+        <ConfirmDialog
+          title="Supprimer cette chaîne"
+          message="Toutes les règles de cette chaîne seront supprimées. Vous devrez appliquer les changements pour qu'ils prennent effet."
+          confirmLabel="Supprimer"
+          confirmColor="#ef4444"
+          onConfirm={handleDeleteChain}
+          onCancel={() => setPendingDeleteChain(null)}
+        />
+      )}
+
+      {/* Set create dialog */}
+      {showSetDialog && (
+        <SetDialog
+          family={family}
+          table={tableName}
+          onClose={() => setShowSetDialog(false)}
+        />
+      )}
+
+      {/* Set edit dialog */}
+      {editingSet && (
+        <SetDialog
+          family={family}
+          table={tableName}
+          editSet={editingSet}
+          onClose={() => setEditingSet(null)}
+        />
+      )}
+
+      {/* Set delete confirm */}
+      {pendingDeleteSet !== null && (
+        <ConfirmDialog
+          title="Supprimer ce set"
+          message="Les règles référençant ce set pourront échouer. Vous devrez appliquer les changements pour qu'ils prennent effet."
+          confirmLabel="Supprimer"
+          confirmColor="#ef4444"
+          onConfirm={handleDeleteSet}
+          onCancel={() => setPendingDeleteSet(null)}
+        />
+      )}
+
+      {/* Table edit dialog */}
+      {showTableEdit && (
+        <TableDialog
+          editTable={tableModel.table}
+          onClose={() => {
+            setShowTableEdit(false);
+            // If the table was renamed, update navigation
+            const currentModel = useRulesetStore.getState().model;
+            if (currentModel) {
+              const stillExists = currentModel.tables.some(
+                (t) =>
+                  `${t.table.family}:${t.table.name}` === selectedTableId,
+              );
+              if (!stillExists) {
+                // Find the table by handle (it was renamed)
+                const renamed = currentModel.tables.find(
+                  (t) => t.table.handle === tableModel.table.handle,
+                );
+                if (renamed) {
+                  navigateToTable(
+                    `${renamed.table.family}:${renamed.table.name}`,
+                  );
+                } else {
+                  navigateToDashboard();
+                }
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* Table delete confirm */}
+      {pendingDeleteTable && (
+        <ConfirmDialog
+          title="Supprimer cette table"
+          message={`Toutes les chaînes, règles et sets de la table « ${tableName} » seront supprimés.`}
+          confirmLabel="Supprimer"
+          confirmColor="#ef4444"
+          onConfirm={handleDeleteTable}
+          onCancel={() => setPendingDeleteTable(false)}
+        />
       )}
     </div>
   );
@@ -144,6 +365,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     color: "#64748b",
   },
+  tableActions: {
+    display: "flex",
+    gap: 6,
+    marginLeft: "auto",
+  },
+  tableActionBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 32,
+    height: 32,
+    background: "transparent",
+    border: "1px solid #334155",
+    borderRadius: 8,
+    color: "#94a3b8",
+    cursor: "pointer",
+    padding: 0,
+  },
   section: {
     marginBottom: 28,
   },
@@ -154,6 +393,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     border: "1px dashed #1e293b",
     borderRadius: 12,
+  },
+  addBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    width: "100%",
+    padding: "10px",
+    background: "transparent",
+    border: "1px dashed #334155",
+    borderRadius: 8,
+    color: "#64748b",
+    fontSize: 13,
+    cursor: "pointer",
+    marginTop: 12,
   },
   setsHeader: {
     display: "flex",

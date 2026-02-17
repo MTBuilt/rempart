@@ -8,6 +8,8 @@ import {
   Router,
   Layers,
   Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import type { ChainModel, NftRule } from "../../types/nftables";
 import { humanizeChain, humanizePolicy } from "../../utils/humanize";
@@ -30,9 +32,16 @@ const hookIcons: Record<string, React.ReactNode> = {
 interface ChainFlowProps {
   chainModel: ChainModel;
   availableChains: string[];
+  onEditChain?: () => void;
+  onDeleteChain?: () => void;
 }
 
-export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
+export function ChainFlow({
+  chainModel,
+  availableChains,
+  onEditChain,
+  onDeleteChain,
+}: ChainFlowProps) {
   const c = chainModel.chain;
   const isBaseChain = !!c.type;
   const hookLabel = isBaseChain ? humanizeChain(c) : "";
@@ -104,17 +113,37 @@ export function ChainFlow({ chainModel, availableChains }: ChainFlowProps) {
             )}
           </div>
         </div>
-        {c.policy && (
-          <div
-            style={{
-              ...styles.policyBadge,
-              color: policyInfo.color,
-              borderColor: policyInfo.color + "40",
-            }}
-          >
-            {policyInfo.text}
-          </div>
-        )}
+        <div style={styles.headerRight}>
+          {c.policy && (
+            <div
+              style={{
+                ...styles.policyBadge,
+                color: policyInfo.color,
+                borderColor: policyInfo.color + "40",
+              }}
+            >
+              {policyInfo.text}
+            </div>
+          )}
+          {onEditChain && (
+            <button
+              style={styles.headerActionBtn}
+              title="Modifier la chaîne"
+              onClick={onEditChain}
+            >
+              <Pencil size={13} />
+            </button>
+          )}
+          {onDeleteChain && (
+            <button
+              style={{ ...styles.headerActionBtn, color: "#ef4444" }}
+              title="Supprimer la chaîne"
+              onClick={onDeleteChain}
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Rules flow */}
@@ -288,6 +317,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: "#64748b",
     marginTop: 2,
+  },
+  headerRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerActionBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 28,
+    height: 28,
+    background: "transparent",
+    border: "1px solid #334155",
+    borderRadius: 6,
+    color: "#94a3b8",
+    cursor: "pointer",
+    padding: 0,
   },
   policyBadge: {
     fontSize: 12,

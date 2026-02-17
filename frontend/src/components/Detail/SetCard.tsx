@@ -1,4 +1,4 @@
-import { Database, Clock, Layers } from "lucide-react";
+import { Database, Clock, Layers, Pencil, Trash2 } from "lucide-react";
 import type { NftSet } from "../../types/nftables";
 import { humanizeSet } from "../../utils/humanize";
 
@@ -13,7 +13,13 @@ function formatElements(elem: unknown): string {
   return String(elem);
 }
 
-export function SetCard({ set: s }: { set: NftSet }) {
+interface SetCardProps {
+  set: NftSet;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}
+
+export function SetCard({ set: s, onEdit, onDelete }: SetCardProps) {
   const description = humanizeSet(s);
   const typeStr = Array.isArray(s.type) ? s.type.join(" . ") : s.type;
   const elemCount = Array.isArray(s.elem) ? s.elem.length : s.elem ? 1 : 0;
@@ -24,6 +30,28 @@ export function SetCard({ set: s }: { set: NftSet }) {
         <Database size={14} color="#8b5cf6" />
         <span style={styles.name}>{s.name}</span>
         <span style={styles.type}>{typeStr}</span>
+        {(onEdit || onDelete) && (
+          <div style={styles.actions}>
+            {onEdit && (
+              <button
+                style={styles.actionBtn}
+                title="Modifier le set"
+                onClick={onEdit}
+              >
+                <Pencil size={12} />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                style={{ ...styles.actionBtn, color: "#ef4444" }}
+                title="Supprimer le set"
+                onClick={onDelete}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div style={styles.body}>
         <span style={styles.desc}>{description}</span>
@@ -77,6 +105,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11,
     color: "#64748b",
     marginLeft: "auto",
+  },
+  actions: {
+    display: "flex",
+    gap: 4,
+    marginLeft: 8,
+  },
+  actionBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 24,
+    height: 24,
+    background: "transparent",
+    border: "1px solid #334155",
+    borderRadius: 5,
+    color: "#94a3b8",
+    cursor: "pointer",
+    padding: 0,
   },
   body: {
     marginBottom: 8,

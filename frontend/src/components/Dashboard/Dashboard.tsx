@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Shield,
   Table2,
@@ -5,11 +6,16 @@ import {
   FileText,
   Database,
   ArrowRight,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useRulesetStore } from "../../state/rulesetStore";
 import { useUiStore } from "../../state/uiStore";
-import type { RulesetModel, ChainModel } from "../../types/nftables";
+import type { RulesetModel, NftTable, ChainModel } from "../../types/nftables";
 import { humanizeChain, humanizePolicy } from "../../utils/humanize";
+import { TableDialog } from "../Dialogs/TableDialog";
+import { ConfirmDialog } from "../Dialogs/ConfirmDialog";
 
 const familyConfig: Record<
   string,
@@ -71,10 +77,35 @@ function getChainLabel(cm: ChainModel): string {
 
 export function Dashboard() {
   const model = useRulesetStore((s) => s.model);
+  const updateModelFromTree = useRulesetStore((s) => s.updateModelFromTree);
   const navigateToTable = useUiStore((s) => s.navigateToTable);
+
+  const [showTableDialog, setShowTableDialog] = useState(false);
+  const [editingTable, setEditingTable] = useState<NftTable | null>(null);
+  const [pendingDeleteTable, setPendingDeleteTable] = useState<{
+    family: string;
+    name: string;
+  } | null>(null);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   if (!model) return null;
   const stats = getStats(model);
+
+  const handleDeleteTable = () => {
+    if (!pendingDeleteTable) return;
+    updateModelFromTree((model: RulesetModel) => {
+      const clone = structuredClone(model);
+      clone.tables = clone.tables.filter(
+        (t) =>
+          !(
+            t.table.family === pendingDeleteTable.family &&
+            t.table.name === pendingDeleteTable.name
+          ),
+      );
+      return clone;
+    });
+    setPendingDeleteTable(null);
+  };
 
   return (
     <div style={styles.container}>
@@ -121,6 +152,7 @@ export function Dashboard() {
             (n, c) => n + c.rules.length,
             0,
           );
+          const isHovered = hoveredCard === id;
 
           return (
             <div
@@ -130,9 +162,44 @@ export function Dashboard() {
                 ...styles.card,
                 borderColor: fc.border,
                 background: fc.bg,
+                position: "relative" as const,
               }}
               onClick={() => navigateToTable(id)}
+              onMouseEnter={() => setHoveredCard(id)}
+              onMouseLeave={() => setHoveredCard(null)}
             >
+              {/* Hover action buttons */}
+              {isHovered && (
+                <div style={styles.cardActions}>
+                  <button
+                    style={styles.cardActionBtn}
+                    title="Modifier"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTable(tm.table);
+                    }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    style={{
+                      ...styles.cardActionBtn,
+                      color: "#ef4444",
+                    }}
+                    title="Supprimer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingDeleteTable({
+                        family: tm.table.family,
+                        name: tm.table.name,
+                      });
+                    }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
+
               {/* Card header */}
               <div style={styles.cardHeader}>
                 <div
@@ -193,6 +260,15 @@ export function Dashboard() {
             </div>
           );
         })}
+
+        {/* Add table button */}
+        <button
+          style={styles.addTableBtn}
+          onClick={() => setShowTableDialog(true)}
+        >
+          <Plus size={18} />
+          <span>Ajouter une table</span>
+        </button>
       </div>
 
       {model.tables.length === 0 && (
@@ -200,10 +276,35 @@ export function Dashboard() {
           <Shield size={40} color="#1e293b" />
           <p style={styles.emptyTitle}>Aucune table</p>
           <p style={styles.emptyDesc}>
-            Le ruleset est vide. Utilisez le panneau Code pour ajouter des
-            tables.
+            Créez votre première table pour commencer à configurer votre
+            firewall.
           </p>
         </div>
+      )}
+
+      {/* Table create dialog */}
+      {showTableDialog && (
+        <TableDialog onClose={() => setShowTableDialog(false)} />
+      )}
+
+      {/* Table edit dialog */}
+      {editingTable && (
+        <TableDialog
+          editTable={editingTable}
+          onClose={() => setEditingTable(null)}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {pendingDeleteTable && (
+        <ConfirmDialog
+          title="Supprimer cette table"
+          message={`Toutes les chaînes, règles et sets de la table « ${pendingDeleteTable.name} » seront supprimés. Vous devrez appliquer les changements pour qu'ils prennent effet.`}
+          confirmLabel="Supprimer"
+          confirmColor="#ef4444"
+          onConfirm={handleDeleteTable}
+          onCancel={() => setPendingDeleteTable(null)}
+        />
       )}
     </div>
   );
@@ -289,6 +390,26 @@ const styles: Record<string, React.CSSProperties> = {
     transition: "transform 0.15s, box-shadow 0.15s",
     animation: "fadeIn 0.3s ease-out",
   },
+  cardActions: {
+    position: "absolute" as const,
+    top: 8,
+    right: 8,
+    display: "flex",
+    gap: 4,
+  },
+  cardActionBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 26,
+    height: 26,
+    background: "rgba(15, 23, 42, 0.85)",
+    border: "1px solid #334155",
+    borderRadius: 6,
+    color: "#94a3b8",
+    cursor: "pointer",
+    padding: 0,
+  },
   cardHeader: {
     display: "flex",
     alignItems: "center",
@@ -354,6 +475,22 @@ const styles: Record<string, React.CSSProperties> = {
   footerTotal: {
     marginLeft: "auto",
     color: "#475569",
+  },
+  addTableBtn: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 32,
+    background: "transparent",
+    border: "1px dashed #334155",
+    borderRadius: 12,
+    color: "#64748b",
+    fontSize: 14,
+    cursor: "pointer",
+    transition: "all 0.15s",
+    minHeight: 120,
   },
   empty: {
     display: "flex",
